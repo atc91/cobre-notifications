@@ -40,9 +40,9 @@ The case-critical path is **P-01 → P-11** (delivery pipeline + the three manda
 
 | Status | Phase | Description |
 |---|---|---|
-| · | P-09 · `GET /notification_events` | List, client-scoped, filter by creation date range + `delivery_status`, paginated. |
-| · | P-10 · `GET /notification_events/{id}` | Single event details; 404 when not found **or not owned** (no existence leak). |
-| · | P-11 · `POST /{id}/replay` | Re-enqueue a `FAILED` notification (409 otherwise); resets to `PENDING`, `nextRetryAt = now`. Closes the delivery loop with the retry engine. |
+| ✓ | P-09 · `GET /notification_events` | List, client-scoped, filter by creation date range + `delivery_status`, paginated. |
+| ✓ | P-10 · `GET /notification_events/{id}` | Single event details; 404 when not found **or not owned** (no existence leak). |
+| ✓ | P-11 · `POST /{id}/replay` | Re-enqueue a `FAILED` notification (409 otherwise); resets to `PENDING`, `nextRetryAt = now`. Closes the delivery loop with the retry engine. |
 
 ## Hardening
 

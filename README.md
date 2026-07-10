@@ -17,10 +17,13 @@ overview diagram, the domain model, the dual-write/retry design, security (OWASP
 observability. See also [`specs/mission.md`](specs/mission.md) (the problem & goals) and
 [`specs/roadmap.md`](specs/roadmap.md) (the phased plan).
 
-> **Status — delivery pipeline complete (P-08).** Ingestion (JSON seed → subscription-gated
+> **Status — self-service API complete (P-11).** Ingestion (JSON seed → subscription-gated
 > persistence), the delivery worker (claim due rows → SSRF-guarded webhook POST →
-> retry/back-off → dead-letter), and the full domain + R2DBC persistence are in place. Next
-> up: the self-service REST endpoints (P-09–P-11). See [`specs/roadmap.md`](specs/roadmap.md).
+> retry/back-off → dead-letter), and the three mandated self-service endpoints
+> (`GET /notification_events`, `GET /notification_events/{id}`,
+> `POST /notification_events/{id}/replay`, client-scoped via an `X-Client-Id` header) are in
+> place. Next up: hardening — authentication & access control (P-12). See
+> [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Prerequisites
 
