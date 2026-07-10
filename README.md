@@ -1,10 +1,21 @@
 # cobre-notifications
 
 Subscription-gated, reliable delivery of Cobre platform events to client webhooks, with a
-full queryable audit trail and a self-service REST API. See [`specs/`](specs/) for the
-mission, architecture, and phased roadmap.
+full queryable audit trail and a self-service REST API.
 
 Spring Boot 4.1.0 reactive service (WebFlux + Actuator), Java 25, Gradle 9.6.0.
+
+## Architecture
+
+The service **persists first and delivers later**: events are gated against the client's
+subscription, stored in Postgres, then a scheduler POSTs them to the client's webhook behind
+an SSRF guard, retrying with exponential backoff until delivered or dead-lettered. It is built
+as three hexagonal (ports & adapters) bounded contexts in one split-ready deployable.
+
+📐 **[`specs/architecture.md`](specs/architecture.md)** — the solution proposal, an ASCII
+overview diagram, the domain model, the dual-write/retry design, security (OWASP), and
+observability. See also [`specs/mission.md`](specs/mission.md) (the problem & goals) and
+[`specs/roadmap.md`](specs/roadmap.md) (the phased plan).
 
 > **Status — delivery pipeline complete (P-08).** Ingestion (JSON seed → subscription-gated
 > persistence), the delivery worker (claim due rows → SSRF-guarded webhook POST →
