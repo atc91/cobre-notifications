@@ -101,6 +101,7 @@ Notification (aggregate root)
   deliveryStatus            ← PENDING | DELIVERING | RETRYING | DELIVERED | FAILED
   attempts                  ← count
   nextRetryAt               ← drives the due-work query
+  claimedAt                 ← lease timestamp; lets the reaper reclaim stuck DELIVERING rows
   lastError
   createdAt / deliveredAt / updatedAt
 
@@ -159,6 +160,51 @@ Only two of the three contexts own data. `query` has none of its own — it is a
 - `delivery/` + `subscription/` → **notifications-worker** (scales with event volume)
 
 Both talk to the same Postgres and Kafka; no code in `domain`/`application` changes because they only know ports. This is the scalability answer to **Task 1**.
+
+## Delivery flow & the dual-write problem
+
+The flow "event arrives on Kafka → persist → deliver later" contains **two distinct dual-write points**. Naming them separately is what makes them tractable.
+
+### Point 1 — Ingest (Kafka → DB): a single write, not a dual write
+
+We **persist first and deliver later**; we do *not* call the webhook during consumption. Consumption therefore performs a single DB write, so there is nothing to keep in sync. What remains is at-least-once hygiene:
+
+- **Order:** process (DB insert) → *then* commit the Kafka offset. Never commit the offset first. A failed insert means an uncommitted offset, so Kafka redelivers.
+- **Idempotency:** the notification id **is** the `event_id` with a unique constraint, so redelivery is `INSERT ... ON CONFLICT DO NOTHING` — a harmless no-op.
+
+The offset is a checkpoint, not a second copy of business data. Delivering off the *persisted row* (never off the Kafka message) is what makes the database the single source of truth — the "inbox" half of inbox/outbox.
+
+### Point 2 — Delivery (DB row ↔ HTTP webhook): the unavoidable dual write
+
+The external webhook and the database **cannot share a transaction**. Exactly-once across an HTTP boundary is impossible; the choice is at-most-once (risk silent loss) or at-least-once (risk duplicates). For notifications we choose **at-least-once + client idempotency**. We never mark `DELIVERED` optimistically. Ordering:
+
+```
+1. TX: claim a due row (SELECT … FOR UPDATE SKIP LOCKED),
+       set status = DELIVERING, claimedAt = now, attempts += 1     → COMMIT
+2.     HTTP POST to webhook   (header  Idempotency-Key: <event_id>)
+3. TX: INSERT delivery_attempt(outcome),
+       UPDATE notification → DELIVERED | RETRYING(nextRetryAt) | FAILED → COMMIT
+```
+
+The only crash window is **between step 2 and step 3**: the call may have landed but the outcome wasn't recorded. A **reaper** resolves it — any row stuck in `DELIVERING` past a lease timeout (`claimedAt`) is reset to `RETRYING` and re-attempted.
+
+| Crash point | Call made? | DB says | Recovery | Client impact |
+|---|---|---|---|---|
+| After claim (1), before POST | No | `DELIVERING` (stale) | reaper → `RETRYING` → retry | none |
+| After POST (2), before record (3) | Maybe/yes | `DELIVERING` (stale) | reaper → `RETRYING` → retry | **possible duplicate** |
+| During record (3) | Yes | TX rolls back → `DELIVERING` | reaper → `RETRYING` → retry | possible duplicate |
+| Normal success | Yes | `DELIVERED` | — | none |
+| Normal failure | Yes | `RETRYING` / `FAILED` | scheduler retries | none |
+
+### The guarantee
+
+- **Sent ⇒ reflected:** the row *converges* to `DELIVERED`. A crash after a successful send is retried by the reaper; the client dedupes the duplicate via the `Idempotency-Key`; the row ends terminal. A truly-delivered notification is never left silently stuck.
+- **Failed ⇒ reflected:** every attempt writes an append-only `delivery_attempt` row and advances status to `RETRYING`, or to `FAILED` after `maxAttempts` (the replayable dead-letter).
+- **No false success, no silent loss:** we never mark `DELIVERED` without a real 2xx, and the worst case is a *duplicate*, never a *loss*.
+
+### Where the outbox pattern belongs
+
+The **transactional outbox** solves "atomically update my DB *and* publish to Kafka" — which is a **producer-side** concern (the platform services emitting events). Our consumer side makes an HTTP call, not a Kafka publish, so it uses the **inbox + claim-and-record** pattern above instead: same philosophy (DB is the source of truth, side effects derive from persisted state), different mechanism.
 
 ## Reliability & retry design
 
