@@ -22,10 +22,18 @@ public interface NotificationStorePort {
 
     /**
      * Atomically claim up to {@code limit} notifications that are due at {@code now} (status
-     * {@code PENDING}/{@code RETRYING} and {@code nextRetryAt <= now}), leasing each for delivery.
+     * {@code PENDING}/{@code RETRYING} and {@code nextRetryAt <= now}), leasing each for delivery:
+     * each returned row comes back {@code DELIVERING} with {@code attempts} incremented and
+     * {@code claimedAt} set. Implemented with {@code FOR UPDATE SKIP LOCKED} so concurrent or
+     * overlapping polls never claim the same row.
      */
     Flux<Notification> claimDue(Instant now, int limit);
 
-    /** Append one delivery-attempt audit row. */
-    Mono<Void> recordAttempt(DeliveryAttempt attempt);
+    /**
+     * Persist the notification's advanced state (status, attempts, {@code nextRetryAt},
+     * {@code deliveredAt}, {@code lastError}, {@code claimedAt}) <em>and</em> append its
+     * {@code delivery_attempts} audit row in a single transaction — step 3 of the delivery flow,
+     * run after each webhook attempt.
+     */
+    Mono<Void> recordOutcome(Notification notification, DeliveryAttempt attempt);
 }

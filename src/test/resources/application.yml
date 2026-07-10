@@ -10,3 +10,9 @@ notifications:
     enabled: false
   subscription-seed:
     enabled: false
+  # Reach the loopback stub server in adapter/pipeline ITs (production keeps the guard strict).
+  webhook:
+    block-private-networks: false
+  # Do not auto-run the delivery poller in @SpringBootTest contexts; ITs drive deliverDue() directly.
+  delivery:
+    scheduler-enabled: false
