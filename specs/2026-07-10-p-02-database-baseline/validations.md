@@ -4,61 +4,69 @@ Each item is independently verifiable. Check only what you have actually observe
 
 ## Build & dependencies
 
-- [ ] `build.gradle.kts` declares `spring-boot-starter-data-r2dbc` (implementation) and
+- [x] `build.gradle.kts` declares `spring-boot-starter-data-r2dbc` (implementation) and
       `org.postgresql:r2dbc-postgresql` (runtimeOnly); no JDBC driver on the **main** classpath.
-- [ ] Flyway + JDBC are **test-scope only**: `spring-boot-starter-jdbc`, `flyway-core`,
+- [x] Flyway + JDBC are **test-scope only**: `spring-boot-starter-jdbc`, `flyway-core`,
       `spring-boot-flyway`, `flyway-database-postgresql` (testRuntimeOnly), `postgresql`
       (testRuntimeOnly).
-- [ ] Testcontainers deps present in test scope: `spring-boot-testcontainers`,
+- [x] Testcontainers deps present in test scope: `spring-boot-testcontainers`,
       `testcontainers-postgresql`, `testcontainers-r2dbc`.
 
 ## Schema (migrations)
 
-- [ ] `src/main/flyway/` contains `V1__create_subscriptions.sql`,
+- [x] `src/main/flyway/` contains `V1__create_subscriptions.sql`,
       `V2__create_notifications.sql`, and `V3__create_delivery_attempts.sql`.
-- [ ] `notifications.id` is `VARCHAR PRIMARY KEY` (the platform `event_id`, e.g. `EVT001`),
+- [x] `notifications.id` is `VARCHAR PRIMARY KEY` (the platform `event_id`, e.g. `EVT001`),
       **not** a UUID.
-- [ ] `notifications.delivery_status` is `VARCHAR` with a `CHECK` over
+- [x] `notifications.delivery_status` is `VARCHAR` with a `CHECK` over
       `PENDING/DELIVERING/RETRYING/DELIVERED/FAILED` and defaults to `PENDING`;
-      `attempts` defaults to `0`.
-- [ ] `notifications` insert-time columns are `NOT NULL` (`id`, `client_id`, `event_type`,
+      `attempts` defaults to `0`. _(CHECK verified by `deliveryStatusCheckConstraintRejectsUnknownValue`;
+      defaults verified by `notificationRoundTrips`.)_
+- [x] `notifications` insert-time columns are `NOT NULL` (`id`, `client_id`, `event_type`,
       `content`, `created_at`, `updated_at`); later-populated columns are nullable
       (`target_url`, `next_retry_at`, `claimed_at`, `last_error`, `delivered_at`).
-- [ ] `subscriptions` has a unique constraint on `(client_id, event_type)` and
+- [x] `subscriptions` has a unique constraint on `(client_id, event_type)` and
       `active BOOLEAN NOT NULL DEFAULT true`.
-- [ ] `delivery_attempts.notification_id` is `NOT NULL REFERENCES notifications(id)`.
-- [ ] Indexes exist on `notifications (delivery_status, next_retry_at)`,
+- [x] `delivery_attempts.notification_id` is `NOT NULL REFERENCES notifications(id)`.
+- [x] Indexes exist on `notifications (delivery_status, next_retry_at)`,
       `notifications (client_id, created_at)`, and `delivery_attempts (notification_id)`.
 
 ## Wiring & config
 
-- [ ] `application.yml` has a `spring.r2dbc` block (`url`, `username`, `password`) sourced
+- [x] `application.yml` has a `spring.r2dbc` block (`url`, `username`, `password`) sourced
       from env vars with localhost defaults; no Flyway config in the main resources.
-- [ ] `application-local.yml` enables `org.springframework.r2dbc` /
+- [x] `application-local.yml` enables `org.springframework.r2dbc` /
       `io.r2dbc.postgresql.QUERY` at `DEBUG`.
-- [ ] `src/test/resources/application.yml` sets
+- [x] `src/test/resources/application.yml` sets
       `spring.flyway.locations: filesystem:src/main/flyway`.
-- [ ] `.env.example` lists the DB variables the R2DBC block reads
+- [x] `.env.example` lists the DB variables the R2DBC block reads
       (`POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`), consistent with Compose.
-- [ ] Running the app with `-Dspring.profiles.active=local` against
-      `docker compose up notifications-db -d` connects via R2DBC (SQL debug logging appears)
-      and `/actuator/health` returns `UP`.
+- [x] Running the app with `-Dspring.profiles.active=local` against
+      `docker compose up notifications-db -d` connects via R2DBC (SQL debug logging appears —
+      `io.r2dbc.postgresql.QUERY` probes run against Postgres) and `/actuator/health` returns
+      HTTP 200 `{"status":"UP"}`. _(Requires a local `.env` copied from `.env.example`.)_
+- [x] `docker compose up flyway --exit-code-from flyway` applies all three migrations and
+      exits 0; `\dt` on `notifications-db` then shows `subscriptions`, `notifications`,
+      `delivery_attempts` (plus `flyway_schema_history`).
+- [x] `docker compose up -d --build` brings up the full stack in order (DB healthy → flyway
+      migrates and exits 0 → `notifications-app` starts); the app reaches `healthy` and
+      `curl http://localhost:8080/actuator/health` returns HTTP 200 `{"status":"UP"}`.
 
 ## Tests (one checkbox per required test)
 
-- [ ] **[Integration]** `schemaLoads` passes — after Flyway applies the migrations,
+- [x] **[Integration]** `schemaLoads` passes — after Flyway applies the migrations,
       `subscriptions`, `notifications`, and `delivery_attempts` are all present
       (`information_schema.tables` via `DatabaseClient` + `StepVerifier`).
-- [ ] **[Integration]** `notificationRoundTrips` passes — a `PENDING` notification inserted
+- [x] **[Integration]** `notificationRoundTrips` passes — a `PENDING` notification inserted
       via R2DBC reads back with defaults applied (`attempts = 0`, `created_at` set,
       `delivery_status = 'PENDING'`).
-- [ ] **[Integration]** `deliveryStatusCheckConstraintRejectsUnknownValue` passes —
+- [x] **[Integration]** `deliveryStatusCheckConstraintRejectsUnknownValue` passes —
       inserting an out-of-set `delivery_status` fails the `CHECK` constraint.
 
 ## CI & merge criteria
 
-- [ ] `./gradlew build` succeeds from a clean checkout with Docker running (all integration
-      tests green).
+- [x] `./gradlew build` succeeds from a clean checkout with Docker running (all integration
+      tests green — 2 app + 3 schema, 0 failures).
 - [ ] The CI workflow run on the `feature/p-02-database-baseline` branch is **green**
       (Testcontainers available on the runner).
 - [ ] **Merge criteria:** all boxes above checked, CI green, no domain/entity/repository or

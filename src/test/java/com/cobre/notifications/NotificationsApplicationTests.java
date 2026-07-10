@@ -4,11 +4,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
 
+// R2DBC is wired as of P-02, so the health endpoint aggregates an r2dbc indicator; a real
+// database must be present for the context to boot healthy.
 @SpringBootTest(webEnvironment = RANDOM_PORT)
+@Import(TestcontainersConfiguration.class)
 class NotificationsApplicationTests {
 
     @LocalServerPort

@@ -1,5 +1,4 @@
 services:
-  # Staged for P-02 (R2DBC + Flyway wiring). The app does not connect to it yet.
   notifications-db:
     image: postgres:18-alpine
     ports:
@@ -13,3 +12,42 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # One-shot migration job: applies the Flyway schema to notifications-db for local runs.
+  # The app image never runs Flyway (prod connects via R2DBC only); this mirrors the
+  # production model of a separate out-of-band migration job. Runs `migrate` and exits.
+  flyway:
+    image: flyway/flyway:11-alpine
+    depends_on:
+      notifications-db:
+        condition: service_healthy
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://notifications-db:5432/${POSTGRES_DB}
+      FLYWAY_USER: ${POSTGRES_USER}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      FLYWAY_CONNECT_RETRIES: "10"
+    volumes:
+      - ./src/main/flyway:/flyway/sql:ro
+
+  # The notifications service itself, built from the Dockerfile. Starts only after the DB
+  # is healthy and migrations have completed, then connects over R2DBC across the network.
+  notifications-app:
+    build: .
+    depends_on:
+      notifications-db:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_R2DBC_URL: r2dbc:postgresql://notifications-db:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

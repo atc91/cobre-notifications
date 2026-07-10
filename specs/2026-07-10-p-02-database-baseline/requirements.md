@@ -65,8 +65,17 @@ the production container uses **R2DBC exclusively** and assumes the schema alrea
     so Flyway applies the migrations before the R2DBC tests run.
 12. `.env.example` reflects any DB variables the R2DBC block reads (reusing the existing
     `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` already used by Compose).
-13. `docker-compose.yml`'s staged `notifications-db` service is confirmed as the target the
-    R2DBC wiring points at for local runs (no functional change required if already correct).
+13. `docker-compose.yml` gains a one-shot **`flyway`** migration service that applies the
+    `src/main/flyway` migrations to `notifications-db`. Because Flyway is test-scope in the
+    build and the app image connects via R2DBC only, `docker compose up` would otherwise
+    start an **empty** database; the migration service makes local runs functional and
+    mirrors the production model (schema applied by a separate out-of-band job, never by the
+    app). It `depends_on` the DB being healthy, runs `migrate`, and exits.
+14. `docker-compose.yml` gains a **`notifications-app`** service built from the `Dockerfile`.
+    It `depends_on` `notifications-db` (healthy) and `flyway` (completed successfully), exposes
+    `8080`, connects to the DB over the Compose network via `SPRING_R2DBC_URL`
+    (`r2dbc:postgresql://notifications-db:5432/...`), and has an `/actuator/health`
+    healthcheck. `docker compose up` brings up the whole stack: DB → migrations → app.
 
 ## Non-functional requirements
 

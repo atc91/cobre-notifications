@@ -42,7 +42,13 @@ schema, configuration/wiring, tests, and wrap-up. No frontend and no domain/adap
 - [ ] `.env.example` — confirm/align `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD` with
       the R2DBC url/username/password the app now reads.
 - [ ] Confirm `docker-compose.yml` `notifications-db` matches the R2DBC target (host, port,
-      db name); no change if already aligned.
+      db name).
+- [ ] Add a one-shot `flyway` service to `docker-compose.yml` (`flyway/flyway:11-alpine`,
+      `depends_on` DB healthy, `command: migrate`, mounts `./src/main/flyway:/flyway/sql`) so
+      `docker compose up` applies the schema to the local DB.
+- [ ] Add a `notifications-app` service (`build: .`, `depends_on` DB healthy + flyway
+      completed, `SPRING_R2DBC_URL` → `notifications-db`, port 8080, health-check) so the full
+      stack runs from `docker compose up`.
 
 ## Tests
 

@@ -1,6 +1,9 @@
 # Local development profile: activate with -Dspring.profiles.active=local
 # Hardcoded, developer-friendly overrides only. No secrets.
-# (Database credentials arrive in P-02 alongside R2DBC wiring.)
+# R2DBC defaults in application.yml already point at the docker-compose notifications-db.
 logging:
   level:
     com.cobre.notifications: DEBUG
+    # Surface R2DBC connections and SQL for local debugging.
+    org.springframework.r2dbc: DEBUG
+    io.r2dbc.postgresql.QUERY: DEBUG
