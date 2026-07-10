@@ -1,0 +1,32 @@
+{
+  "subscriptions": [
+    {
+      "client_id": "CLIENT001",
+      "event_type": "*",
+      "target_url": "https://client1.example.com/webhooks/cobre",
+      "secret": "whsec_client001",
+      "active": true
+    },
+    {
+      "client_id": "CLIENT002",
+      "event_type": "*",
+      "target_url": "https://client2.example.com/webhooks/cobre",
+      "secret": "whsec_client002",
+      "active": true
+    },
+    {
+      "client_id": "CLIENT003",
+      "event_type": "credit_refund",
+      "target_url": "https://client3.example.com/webhooks/cobre",
+      "secret": "whsec_client003",
+      "active": true
+    },
+    {
+      "client_id": "CLIENT003",
+      "event_type": "debit_transfer",
+      "target_url": "https://client3.example.com/webhooks/cobre",
+      "secret": "whsec_client003",
+      "active": true
+    }
+  ]
+}

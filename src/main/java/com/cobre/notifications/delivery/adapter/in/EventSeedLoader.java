@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -26,20 +27,22 @@ import java.util.List;
  * unchanged.
  *
  * <p>Ingestion is idempotent (the store dedupes on {@code event_id}), so re-running on restart is safe.
- * Activation is gated by {@code notifications.seed.enabled} (default {@code true}); the test profile
- * disables it so {@code @SpringBootTest} contexts do not auto-seed.
+ * Ordered after {@code SubscriptionSeedLoader} ({@code @Order(2)}) so subscriptions exist before events
+ * are gated against them (P-05). Activation is gated by {@code notifications.seed.enabled} (default
+ * {@code true}); the test profile disables it so {@code @SpringBootTest} contexts do not auto-seed.
  */
 @Component
+@Order(2) // after SubscriptionSeedLoader (@Order(1)): subscriptions must exist before events are gated
 @ConditionalOnProperty(name = "notifications.seed.enabled", havingValue = "true", matchIfMissing = true)
-public class JsonSeedLoader implements ApplicationRunner {
+public class EventSeedLoader implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(JsonSeedLoader.class);
+    private static final Logger log = LoggerFactory.getLogger(EventSeedLoader.class);
 
     private final IngestEventUseCase ingest;
     private final ObjectMapper objectMapper;
     private final Resource seedResource;
 
-    public JsonSeedLoader(
+    public EventSeedLoader(
             IngestEventUseCase ingest,
             ObjectMapper objectMapper,
             @Value("${notifications.seed.location:classpath:notification_events.json}") Resource seedResource) {
@@ -51,9 +54,9 @@ public class JsonSeedLoader implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         seed().subscribe(
-                ingested -> log.info("JSON seed loader: ingested {} event(s) from {}",
+                ingested -> log.info("event seed loader: ingested {} event(s) from {}",
                         ingested, seedResource.getDescription()),
-                err -> log.error("JSON seed loader failed for {}", seedResource.getDescription(), err));
+                err -> log.error("event seed loader failed for {}", seedResource.getDescription(), err));
     }
 
     /**
@@ -64,12 +67,12 @@ public class JsonSeedLoader implements ApplicationRunner {
     Mono<Long> seed() {
         List<PlatformEvent> events;
         try (InputStream in = seedResource.getInputStream()) {
-            events = SeedFileParser.parse(in, objectMapper);
+            events = EventSeedParser.parse(in, objectMapper);
         } catch (IOException | JacksonException e) {
-            log.error("JSON seed loader: cannot read seed resource {}", seedResource.getDescription(), e);
+            log.error("event seed loader: cannot read seed resource {}", seedResource.getDescription(), e);
             return Mono.just(0L);
         }
-        log.info("JSON seed loader: ingesting {} event(s) from {}", events.size(), seedResource.getDescription());
+        log.info("event seed loader: ingesting {} event(s) from {}", events.size(), seedResource.getDescription());
         return Flux.fromIterable(events)
                 .concatMap(this::ingestOne)
                 .count();
@@ -80,7 +83,7 @@ public class JsonSeedLoader implements ApplicationRunner {
         return ingest.ingest(event)
                 .thenReturn(event)
                 .onErrorResume(ex -> {
-                    log.warn("JSON seed loader: skipping event {}: {}", event.eventId(), ex.toString());
+                    log.warn("event seed loader: skipping event {}: {}", event.eventId(), ex.toString());
                     return Mono.empty();
                 });
     }

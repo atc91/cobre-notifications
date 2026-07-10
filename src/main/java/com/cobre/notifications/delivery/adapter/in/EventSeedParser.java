@@ -16,26 +16,26 @@ import java.util.List;
  * a single malformed entry is logged and skipped rather than aborting the whole seed, so one bad row
  * never blocks the rest.
  */
-final class SeedFileParser {
+final class EventSeedParser {
 
-    private static final Logger log = LoggerFactory.getLogger(SeedFileParser.class);
+    private static final Logger log = LoggerFactory.getLogger(EventSeedParser.class);
 
-    private SeedFileParser() {
+    private EventSeedParser() {
     }
 
     /** Read the {@code events} array from the stream; skip (and log) any entry that fails to bind. */
     static List<PlatformEvent> parse(InputStream in, ObjectMapper mapper) {
         JsonNode events = mapper.readTree(in).path("events");
         if (!events.isArray()) {
-            log.warn("JSON seed: no 'events' array found; nothing to ingest");
+            log.warn("event seed: no 'events' array found; nothing to ingest");
             return List.of();
         }
         List<PlatformEvent> result = new ArrayList<>();
         for (JsonNode node : events) {
             try {
-                result.add(mapper.treeToValue(node, SeedEvent.class).toPlatformEvent());
+                result.add(mapper.treeToValue(node, EventSeedEntry.class).toPlatformEvent());
             } catch (JacksonException e) {
-                log.warn("JSON seed: skipping malformed entry {}: {}", node, e.getMessage());
+                log.warn("event seed: skipping malformed entry {}: {}", node, e.getMessage());
             }
         }
         return result;
