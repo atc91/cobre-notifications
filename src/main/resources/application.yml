@@ -18,6 +18,23 @@ notifications:
   subscription-seed:
     enabled: ${NOTIFICATIONS_SUBSCRIPTION_SEED_ENABLED:true}
     location: ${NOTIFICATIONS_SUBSCRIPTION_SEED_LOCATION:classpath:subscriptions.json}
+  # Webhook client (P-06): SSRF guard strict by default; strict https-only + private/loopback/metadata
+  # blocking. Timeouts bound each outbound call.
+  webhook:
+    block-private-networks: ${NOTIFICATIONS_WEBHOOK_BLOCK_PRIVATE_NETWORKS:true}
+    connect-timeout-ms: ${NOTIFICATIONS_WEBHOOK_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${NOTIFICATIONS_WEBHOOK_READ_TIMEOUT_MS:5000}
+  # Delivery worker (P-07): the scheduler polls for due rows and delivers them in batches.
+  delivery:
+    scheduler-enabled: ${NOTIFICATIONS_DELIVERY_SCHEDULER_ENABLED:true}
+    poll-interval-ms: ${NOTIFICATIONS_DELIVERY_POLL_INTERVAL_MS:5000}
+    batch-size: ${NOTIFICATIONS_DELIVERY_BATCH_SIZE:100}
+  # Retry policy (P-08, assumption A4): exponential back-off + jitter, capped, then dead-letter.
+  retry:
+    max-attempts: ${NOTIFICATIONS_RETRY_MAX_ATTEMPTS:5}
+    base-delay-ms: ${NOTIFICATIONS_RETRY_BASE_DELAY_MS:30000}
+    factor: ${NOTIFICATIONS_RETRY_FACTOR:2}
+    cap-ms: ${NOTIFICATIONS_RETRY_CAP_MS:3600000}
 
 server:
   port: 8080
