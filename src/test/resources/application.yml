@@ -4,7 +4,9 @@ spring:
   flyway:
     locations: filesystem:src/main/flyway
 
-# Do not auto-seed in @SpringBootTest contexts; the seed-loader IT opts back in explicitly.
+# Do not auto-seed in @SpringBootTest contexts; the seed-loader ITs opt back in explicitly.
 notifications:
   seed:
+    enabled: false
+  subscription-seed:
     enabled: false

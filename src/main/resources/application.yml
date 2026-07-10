@@ -9,10 +9,15 @@ spring:
 
 # JSON seed loader (P-04): on startup, ingest notification_events.json as PENDING notifications.
 # Idempotent, so restarts are safe. Disable via env in environments fed by Kafka (P-14).
+# Subscription seed loader (P-05): on startup, register subscriptions.json rows; runs before the
+# event loader so ingest can resolve each event against a subscription (the delivery gate).
 notifications:
   seed:
     enabled: ${NOTIFICATIONS_SEED_ENABLED:true}
     location: ${NOTIFICATIONS_SEED_LOCATION:classpath:notification_events.json}
+  subscription-seed:
+    enabled: ${NOTIFICATIONS_SUBSCRIPTION_SEED_ENABLED:true}
+    location: ${NOTIFICATIONS_SUBSCRIPTION_SEED_LOCATION:classpath:subscriptions.json}
 
 server:
   port: 8080

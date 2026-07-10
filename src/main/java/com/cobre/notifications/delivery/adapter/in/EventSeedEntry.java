@@ -14,7 +14,7 @@ import java.time.Instant;
  * present in the file without breaking parsing.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-record SeedEvent(
+record EventSeedEntry(
         @JsonProperty("event_id") String eventId,
         @JsonProperty("event_type") String eventType,
         @JsonProperty("content") String content,

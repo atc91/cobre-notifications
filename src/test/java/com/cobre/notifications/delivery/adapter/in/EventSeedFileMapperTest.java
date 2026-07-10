@@ -12,12 +12,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Unit test for the seed-file mapping. No Spring — it parses the bundled {@code notification_events.json}
+ * Unit test for the event seed-file mapping. No Spring — it parses the bundled {@code notification_events.json}
  * with a hand-built {@link ObjectMapper} and asserts each entry maps to a {@link PlatformEvent} with the
  * right fields. The seed's {@code delivery_status} is proven to be dropped: {@code PlatformEvent} carries
  * no status, so ingest always starts {@code PENDING}.
  */
-class SeedFileMapperTest {
+class EventSeedFileMapperTest {
 
     // Jackson 3 bundles java.time support in databind and registers it by default, so a plain
     // ObjectMapper already deserializes the ISO-8601 delivery_date into an Instant.
@@ -57,7 +57,7 @@ class SeedFileMapperTest {
     private List<PlatformEvent> parseSeedFile() throws IOException {
         try (InputStream in = getClass().getResourceAsStream("/notification_events.json")) {
             assertThat(in).as("notification_events.json on the classpath").isNotNull();
-            return SeedFileParser.parse(in, mapper);
+            return EventSeedParser.parse(in, mapper);
         }
     }
 }
