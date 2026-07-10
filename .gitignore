@@ -3,4 +3,14 @@
 *.iml
 *.ipr
 *.iws
-out/
+/out/
+
+# Gradle
+.gradle/
+build/
+
+# Environment
+.env
+
+# Personal Spring profile overrides
+application-*.local.yml
