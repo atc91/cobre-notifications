@@ -1,0 +1,6 @@
+# Local development profile: activate with -Dspring.profiles.active=local
+# Hardcoded, developer-friendly overrides only. No secrets.
+# (Database credentials arrive in P-02 alongside R2DBC wiring.)
+logging:
+  level:
+    com.cobre.notifications: DEBUG

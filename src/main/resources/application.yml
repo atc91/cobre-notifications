@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: cobre-notifications
+
+server:
+  port: 8080
+
+# Actuator: expose only health (and info) in this phase.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
