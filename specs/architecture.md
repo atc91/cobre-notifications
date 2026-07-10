@@ -6,6 +6,49 @@ The case mandates **hexagonal architecture (ports & adapters)**, so this service
 
 ---
 
+## Solution proposal at a glance
+
+A single Spring Boot WebFlux service that **persists first and delivers later**. Platform events arrive (Kafka in the target design, a JSON seed loader today), are gated against the client's **subscription**, and land in Postgres as `PENDING` notifications. A **scheduler** then claims due rows, POSTs them over HTTPS to the client's webhook behind an **SSRF guard**, records every attempt, and either marks the row `DELIVERED` or schedules an exponential-backoff **retry** — falling through to a replayable `FAILED` dead-letter after `maxAttempts`. A **self-service REST API** reads and re-drives that same store, always scoped to the authenticated client. The database is the single source of truth; every side effect derives from a persisted row.
+
+Three bounded contexts, each a hexagon, one deployable — but the seam between them is already drawn so `query` (API) and `delivery`+`subscription` (worker) can split into two services without touching domain code.
+
+```
+                                           cobre-notifications  (one deployable, 3 hexagons)
+ ┌────────────────────┐                ┌────────────────────────────────────────────────────────────┐
+ │  Cobre platform    │  events        │                                                            │
+ │  services (accounts│ ─────────────▶ │  ┌──────────────┐   subscribed?   ┌────────────────────┐   │
+ │  payments, …)      │  Kafka (target)│  │   INGEST     │ ──────────────▶ │  subscription       │   │
+ └────────────────────┘  / JSON seed   │  │ IngestEvent  │ ◀───targetUrl── │  (SubscriptionPort) │   │
+                         (today)        │  └──────┬───────┘                 └────────────────────┘   │
+                                        │         │ persist PENDING                                  │
+                                        │         ▼                                                  │
+                                        │   ┌───────────────────────────────┐                       │
+                                        │   │  PostgreSQL  (source of truth) │                       │
+                                        │   │  notifications │ delivery_     │                       │
+                                        │   │  (aggregate)   │ attempts      │                       │
+                                        │   └──────┬─────────────────▲───────┘                       │
+                                        │  claim due│ FOR UPDATE      │ record attempt               │
+                                        │  SKIP LOCKED                │ + advance status             │
+                                        │         ▼                   │                              │
+                                        │   ┌──────────────┐   ┌──────┴───────┐  HTTPS POST          │   ┌──────────────┐
+                                        │   │ DueDelivery  │──▶│ WebhookClient │────────────────────────▶│ client        │
+                                        │   │ Scheduler    │   │ (SSRF guard)  │  Idempotency-Key     │   │ webhook URL   │
+                                        │   └──────────────┘   └──────────────┘                      │   └──────────────┘
+                                        │      retry w/ backoff → RETRYING → FAILED (dead-letter)     │
+                                        │                                                            │
+                                        │   ┌───────────────────────────────────────┐               │   ┌──────────────┐
+                                        │   │  Self-service REST API (query hexagon) │◀──────list/───────│ client        │
+                                        │   │  GET  /notification_events[/{id}]      │      inspect  │   │ developer     │
+                                        │   │  POST /notification_events/{id}/replay │──────replay──────▶│ (client-scoped)│
+                                        │   └───────────────────────────────────────┘               │   └──────────────┘
+                                        └────────────────────────────────────────────────────────────┘
+                                            Actuator / Micrometer ─▶ metrics · structured logs · alerts ─▶ monitoring team
+```
+
+**Status lifecycle:** `PENDING → DELIVERING → DELIVERED` on success; `→ RETRYING → DELIVERING` while attempts remain; `→ FAILED` (replayable dead-letter) once exhausted. Detailed in [Domain model](#domain-model) and [Delivery flow & the dual-write problem](#delivery-flow--the-dual-write-problem).
+
+---
+
 ## Assumptions (open — flag to change)
 
 | # | Assumption | Why | Change cost |
