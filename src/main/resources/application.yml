@@ -35,6 +35,10 @@ notifications:
     base-delay-ms: ${NOTIFICATIONS_RETRY_BASE_DELAY_MS:30000}
     factor: ${NOTIFICATIONS_RETRY_FACTOR:2}
     cap-ms: ${NOTIFICATIONS_RETRY_CAP_MS:3600000}
+  # Self-service list endpoint (P-09): pagination defaults and the hard cap on page size.
+  query:
+    default-page-size: ${NOTIFICATIONS_QUERY_DEFAULT_PAGE_SIZE:20}
+    max-page-size: ${NOTIFICATIONS_QUERY_MAX_PAGE_SIZE:100}
 
 server:
   port: 8080
