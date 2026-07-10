@@ -12,29 +12,29 @@ The case-critical path is **P-01 → P-11** (delivery pipeline + the three manda
 
 | Status | Phase | Description |
 |---|---|---|
-| · | P-01 · Project scaffold | Gradle + Spring Boot WebFlux shell, hexagonal package skeleton (`delivery`/`subscription`/`query`/`common`), Docker Compose (Postgres), `/actuator/health`, CI. |
-| · | P-02 · Database baseline | Flyway migrations for `notifications`, `delivery_attempts`, `subscriptions`; R2DBC wiring; one Testcontainers integration test proving the schema loads. |
+| ✓ | P-01 · Project scaffold | Gradle + Spring Boot WebFlux shell, hexagonal package skeleton (`delivery`/`subscription`/`query`/`common`), Docker Compose (Postgres), `/actuator/health`, CI. |
+| ✓ | P-02 · Database baseline | Flyway migrations for `notifications`, `delivery_attempts`, `subscriptions`; R2DBC wiring; one Testcontainers integration test proving the schema loads. |
 
 ## Domain core (no infrastructure)
 
 | Status | Phase | Description |
 |---|---|---|
-| · | P-03 · Domain model + ports | `Notification` aggregate, `DeliveryAttempt`, `DeliveryStatus`, `RetryPolicy` value object, and all inbound/outbound port interfaces. Pure JUnit unit tests for status transitions and backoff math. No Spring. |
+| ✓ | P-03 · Domain model + ports | `Notification` aggregate, `DeliveryAttempt`, `DeliveryStatus`, `RetryPolicy` value object, and all inbound/outbound port interfaces. Pure JUnit unit tests for status transitions and backoff math. No Spring. |
 
 ## Ingestion
 
 | Status | Phase | Description |
 |---|---|---|
-| · | P-04 · JSON seed loader | Inbound adapter (`ApplicationRunner`) reads `notification_events.json` → `IngestEventUseCase` → persists notifications as `PENDING`. `NotificationStorePort` gets its R2DBC adapter. |
-| · | P-05 · Subscription gate | `SubscriptionPort` + R2DBC adapter; ingest confirms the client is subscribed and resolves `targetUrl` before persisting. Events without a matching subscription are rejected/skipped (no cross-client delivery). |
+| ✓ | P-04 · JSON seed loader | Inbound adapter (`ApplicationRunner`) reads `notification_events.json` → `IngestEventUseCase` → persists notifications as `PENDING`. `NotificationStorePort` gets its R2DBC adapter. |
+| ✓ | P-05 · Subscription gate | `SubscriptionPort` + R2DBC adapter; ingest confirms the client is subscribed and resolves `targetUrl` before persisting. Events without a matching subscription are rejected/skipped (no cross-client delivery). |
 
 ## Delivery
 
 | Status | Phase | Description |
 |---|---|---|
-| · | P-06 · Webhook client adapter | `WebhookClientPort` → `WebClientWebhookAdapter`: HTTPS POST with timeouts, no redirects, and the **SSRF guard** (https-only, block private/loopback/metadata ranges). Unit-tested URL validation. |
-| · | P-07 · Delivery use case + scheduler | `DeliverNotificationUseCase` + `DueDeliveryScheduler` claims due rows (`FOR UPDATE SKIP LOCKED`), attempts delivery, records a `DeliveryAttempt`, sets `DELIVERED` or `RETRYING`. |
-| · | P-08 · Retry strategy | Exponential backoff + jitter → `nextRetryAt`; cap at `maxAttempts` → `FAILED` (dead-letter). Integration test drives a flaky stub server through retry → success and retry → exhaustion. |
+| ✓ | P-06 · Webhook client adapter | `WebhookClientPort` → `WebClientWebhookAdapter`: HTTPS POST with timeouts, no redirects, and the **SSRF guard** (https-only, block private/loopback/metadata ranges). Unit-tested URL validation. |
+| ✓ | P-07 · Delivery use case + scheduler | `DeliverNotificationUseCase` + `DueDeliveryScheduler` claims due rows (`FOR UPDATE SKIP LOCKED`), attempts delivery, records a `DeliveryAttempt`, sets `DELIVERED` or `RETRYING`. |
+| ✓ | P-08 · Retry strategy | Exponential backoff + jitter → `nextRetryAt`; cap at `maxAttempts` → `FAILED` (dead-letter). Integration test drives a flaky stub server through retry → success and retry → exhaustion. |
 
 ## Self-service API (the three mandated endpoints)
 

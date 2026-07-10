@@ -6,15 +6,15 @@ mission, architecture, and phased roadmap.
 
 Spring Boot 4.1.0 reactive service (WebFlux + Actuator), Java 25, Gradle 9.6.0.
 
-> **Status — P-01 (project scaffold).** This is the bootable foundation: a WebFlux shell
-> with `/actuator/health` and the hexagonal package skeleton. Database wiring (R2DBC +
-> Flyway) arrives in P-02, so the app does not yet connect to Postgres — the Compose
-> service below is staged for that phase.
+> **Status — delivery pipeline complete (P-08).** Ingestion (JSON seed → subscription-gated
+> persistence), the delivery worker (claim due rows → SSRF-guarded webhook POST →
+> retry/back-off → dead-letter), and the full domain + R2DBC persistence are in place. Next
+> up: the self-service REST endpoints (P-09–P-11). See [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Prerequisites
 
 - JDK 25 (Temurin recommended)
-- Docker (for the local PostgreSQL instance, used from P-02 onward)
+- Docker (local PostgreSQL via Compose, and Testcontainers for the integration tests)
 
 ## Build
 
@@ -22,10 +22,12 @@ Spring Boot 4.1.0 reactive service (WebFlux + Actuator), Java 25, Gradle 9.6.0.
 ./gradlew build
 ```
 
-Compiles the project and runs the integration tests. No database is required — the context
-loads without one in this phase.
+Compiles the project and runs the tests. The integration tests spin up PostgreSQL (and a
+stub webhook server) via Testcontainers, so **Docker must be running**.
 
 ## Run locally
+
+Start PostgreSQL first (see [Local Postgres](#local-postgres) below), then:
 
 ```bash
 ./gradlew bootRun
@@ -33,7 +35,8 @@ loads without one in this phase.
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
-The service starts on port **8080** (Netty/WebFlux).
+The service starts on port **8080** (Netty/WebFlux). On startup it seeds subscriptions and
+events, then the delivery scheduler begins POSTing due notifications to their webhooks.
 
 ## Verify
 
@@ -55,14 +58,15 @@ docker build -t cobre-notifications .
 docker run -p 8080:8080 cobre-notifications
 ```
 
-## Local Postgres (staged for P-02)
+## Local Postgres
 
 ```bash
 cp .env.example .env          # edit credentials if desired
-docker compose up notifications-db -d
+docker compose up notifications-db flyway -d
 ```
 
-Brings up `postgres:18-alpine` on `localhost:5432`. The application does not consume it yet.
+Brings up `postgres:18-alpine` on `localhost:5432` and applies the Flyway migrations. The
+application connects to it over R2DBC at startup.
 
 ## Configuration
 
