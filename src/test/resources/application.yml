@@ -1,0 +1,5 @@
+# Test profile: Flyway applies the schema (via JDBC) to the Testcontainers Postgres
+# before the R2DBC-based tests run. Connection details come from @ServiceConnection.
+spring:
+  flyway:
+    locations: filesystem:src/main/flyway

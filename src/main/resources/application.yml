@@ -1,6 +1,11 @@
 spring:
   application:
     name: cobre-notifications
+  # Production connectivity is R2DBC only. Flyway is test-scope (see src/test/resources).
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:5432/notifications}
+    username: ${POSTGRES_USER:notifications}
+    password: ${POSTGRES_PASSWORD:notifications}
 
 server:
   port: 8080
