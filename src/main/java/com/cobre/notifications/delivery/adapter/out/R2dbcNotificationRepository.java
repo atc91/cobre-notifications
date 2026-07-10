@@ -1,10 +1,8 @@
 package com.cobre.notifications.delivery.adapter.out;
 
 import com.cobre.notifications.delivery.domain.model.DeliveryAttempt;
-import com.cobre.notifications.delivery.domain.model.DeliveryStatus;
 import com.cobre.notifications.delivery.domain.model.Notification;
 import com.cobre.notifications.delivery.domain.port.out.NotificationStorePort;
-import io.r2dbc.spi.Readable;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.ReactiveTransactionManager;
@@ -13,7 +11,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.time.OffsetDateTime;
 
 /**
  * R2DBC adapter implementing {@link NotificationStorePort} over the {@code notifications} and
@@ -100,7 +97,7 @@ public class R2dbcNotificationRepository implements NotificationStorePort {
     public Mono<Notification> findById(String id) {
         return db.sql("SELECT * FROM notifications WHERE id = :id")
                 .bind("id", id)
-                .map(R2dbcNotificationRepository::mapRow)
+                .map(NotificationRowMapper::mapRow)
                 .one();
     }
 
@@ -109,7 +106,7 @@ public class R2dbcNotificationRepository implements NotificationStorePort {
         return db.sql(CLAIM_DUE)
                 .bind("now", now)
                 .bind("limit", limit)
-                .map(R2dbcNotificationRepository::mapRow)
+                .map(NotificationRowMapper::mapRow)
                 .all();
     }
 
@@ -143,26 +140,5 @@ public class R2dbcNotificationRepository implements NotificationStorePort {
     private static DatabaseClient.GenericExecuteSpec bindNullable(
             DatabaseClient.GenericExecuteSpec spec, String name, Object value, Class<?> type) {
         return value == null ? spec.bindNull(name, type) : spec.bind(name, value);
-    }
-
-    private static Notification mapRow(Readable row) {
-        return new Notification(
-                row.get("id", String.class),
-                row.get("client_id", String.class),
-                row.get("event_type", String.class),
-                row.get("content", String.class),
-                row.get("target_url", String.class),
-                DeliveryStatus.valueOf(row.get("delivery_status", String.class)),
-                row.get("attempts", Integer.class),
-                toInstant(row.get("next_retry_at", OffsetDateTime.class)),
-                toInstant(row.get("claimed_at", OffsetDateTime.class)),
-                row.get("last_error", String.class),
-                toInstant(row.get("created_at", OffsetDateTime.class)),
-                toInstant(row.get("delivered_at", OffsetDateTime.class)),
-                toInstant(row.get("updated_at", OffsetDateTime.class)));
-    }
-
-    private static Instant toInstant(OffsetDateTime value) {
-        return value == null ? null : value.toInstant();
     }
 }
